@@ -1,2 +1,0 @@
-# Rac
-rants and confessions
