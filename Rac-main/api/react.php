@@ -1,0 +1,46 @@
+<?php
+session_start();
+require '../db.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $user_id = $_SESSION['user_id'] ?? null;
+    $message_id = $_POST['message_id'] ?? 0;
+    $reaction = $_POST['reaction'] ?? '';
+
+    if (!$user_id || !$message_id || !in_array($reaction, ['like', 'dislike'])) {
+        exit('ERROR');
+    }
+
+    // ✅ check existing reaction
+    $stmt = $conn->prepare("SELECT reaction FROM reactions WHERE user_id = ? AND message_id = ?");
+    $stmt->execute([$user_id, $message_id]);
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($existing) {
+        // update
+        $stmt = $conn->prepare("UPDATE reactions SET reaction = ? WHERE user_id = ? AND message_id = ?");
+        $stmt->execute([$reaction, $user_id, $message_id]);
+    } else {
+        // insert
+        $stmt = $conn->prepare("INSERT INTO reactions (user_id, message_id, reaction) VALUES (?, ?, ?)");
+        $stmt->execute([$user_id, $message_id, $reaction]);
+    }
+
+    // ✅ count likes
+    $stmt = $conn->prepare("SELECT COUNT(*) as c FROM reactions WHERE message_id = ? AND reaction = 'like'");
+    $stmt->execute([$message_id]);
+    $likes = $stmt->fetch(PDO::FETCH_ASSOC)['c'];
+
+    // ✅ count dislikes
+    $stmt = $conn->prepare("SELECT COUNT(*) as c FROM reactions WHERE message_id = ? AND reaction = 'dislike'");
+    $stmt->execute([$message_id]);
+    $dislikes = $stmt->fetch(PDO::FETCH_ASSOC)['c'];
+
+    echo json_encode([
+        'likes' => (int)$likes,
+        'dislikes' => (int)$dislikes,
+        'myReaction' => $reaction
+    ]);
+}
+?>
